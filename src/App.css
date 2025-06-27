@@ -1,0 +1,40 @@
+/* Markdown rendering styles */
+
+.markdown h1,
+.markdown h2,
+.markdown h3 {
+  margin: 0.5em 0 0.3em;
+  font-weight: bold;
+}
+
+.markdown p {
+  margin: 0.4em 0;
+  line-height: 1.5;
+}
+
+.markdown ol,
+.markdown ul {
+  padding-left: 1.4em;
+  margin: 0.4em 0;
+}
+
+.markdown li {
+  margin: 0.2em 0;
+  line-height: 1.4;
+}
+
+.markdown li > p {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  line-height: inherit;
+}
+
+.markdown a {
+  color: #800020;
+  text-decoration: underline;
+}
+
+.markdown strong {
+  font-weight: bold;
+}
