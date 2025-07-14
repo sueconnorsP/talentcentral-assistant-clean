@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "./App.css";
@@ -7,6 +7,7 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [threadId, setThreadId] = useState(null);
 
   const prompts = [
     "How do I get started in a career in construction?",
@@ -16,6 +17,19 @@ function App() {
     "Are there mentors available to help me?",
   ];
 
+  // Load threadId from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("thread_id");
+    if (saved) setThreadId(saved);
+  }, []);
+
+  // Save threadId to localStorage when it changes
+  useEffect(() => {
+    if (threadId) {
+      localStorage.setItem("thread_id", threadId);
+    }
+  }, [threadId]);
+
   const sendMessage = async (text) => {
     const messageText = text || input.trim();
     if (!messageText) return;
@@ -24,6 +38,73 @@ function App() {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setLoading(true);
+
+    try {
+      const res = await fetch("/ask-talent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: messageText,
+          thread_id: threadId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.thread_id && !threadId) {
+        setThreadId(data.thread_id);
+      }
+
+      const assistantMessage = {
+        sender: "assistant",
+        text: data.response,
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error("Error sending message:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="app-container">
+      <h1>TalentCentral Assistant</h1>
+      <div className="chat-window">
+        {messages.map((msg, index) => (
+          <div
+            key={index}
+            className={`message ${msg.sender === "user" ? "user" : "assistant"}`}
+          >
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+          </div>
+        ))}
+        {loading && <div className="message assistant">Typing...</div>}
+      </div>
+
+      <div className="input-area">
+        <input
+          type="text"
+          placeholder="Ask a question..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+        />
+        <button onClick={() => sendMessage()}>Send</button>
+      </div>
+
+      <div className="prompt-buttons">
+        {prompts.map((prompt, i) => (
+          <button key={i} onClick={() => sendMessage(prompt)}>
+            {prompt}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default App;
 
     try {
       const response = await fetch("/ask-talent", {
