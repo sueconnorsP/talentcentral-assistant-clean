@@ -1,3 +1,4 @@
+
 import path from "path";
 import { fileURLToPath } from "url";
 import express from "express";
@@ -23,7 +24,7 @@ app.use(express.json());
 // Initialize OpenAI client
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// API route to handle assistant conversation
+// API route to handle assistant conversation with streaming
 app.post("/ask-talent", async (req, res) => {
   const { message } = req.body;
 
@@ -38,18 +39,25 @@ app.post("/ask-talent", async (req, res) => {
       content: message,
     });
 
-    const run = await openai.beta.threads.runs.createAndPoll(thread.id, {
+    const stream = await openai.beta.threads.runs.stream(thread.id, {
       assistant_id: process.env.ASSISTANT_ID,
     });
 
-    const messages = await openai.beta.threads.messages.list(thread.id);
-    const assistantReply = messages.data.find((msg) => msg.role === "assistant");
+    // Set headers for SSE (Server-Sent Events)
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
 
-    res.json({
-      response: assistantReply?.content[0]?.text?.value || "Hmm, I couldn’t find a good answer for that.",
-    });
+    for await (const chunk of stream) {
+      const content = chunk.data?.delta?.text;
+      if (content) {
+        res.write(`data: ${content}\n\n`);
+      }
+    }
+
+    res.end();
   } catch (err) {
-    console.error("❌ Error during OpenAI call:", err);
+    console.error("❌ Streaming error:", err);
     res.status(500).json({ error: "Server error." });
   }
 });
@@ -63,5 +71,5 @@ app.get("*", (req, res) => {
 
 // Start the server
 app.listen(port, () => {
-  console.log(✅ TalentCentral Assistant server running on port ${port});
+  console.log(`TalentCentral Assistant server running on port ${port}`);
 });
