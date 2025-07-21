@@ -47,6 +47,14 @@ app.post("/ask-talent", async (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
+    res.flushHeaders(); // Ensure immediate header flush
+
+    // Keep-alive ping every 15 seconds
+    const pingInterval = setInterval(() => {
+      res.write(":
+
+"); // Comment to keep connection alive
+    }, 15000);
 
     for await (const chunk of stream) {
       const content = chunk.data?.delta?.text;
@@ -55,6 +63,7 @@ app.post("/ask-talent", async (req, res) => {
       }
     }
 
+    clearInterval(pingInterval);
     res.end();
   } catch (err) {
     console.error("❌ Streaming error:", err);
