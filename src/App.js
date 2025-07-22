@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "./App.css";
@@ -7,6 +7,7 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const chatEndRef = useRef(null);
 
   const prompts = [
     "How do I get started in a career in construction?",
@@ -15,6 +16,12 @@ function App() {
     "Is there funding available for upgrading my skills?",
     "Are there mentors available to help me?",
   ];
+
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
 
   const sendMessage = async (text) => {
     const messageText = text || input.trim();
@@ -25,22 +32,43 @@ function App() {
     setInput("");
     setLoading(true);
 
+    let assistantText = "";
+    const assistantReply = { sender: "assistant", text: "" };
+    setMessages((prev) => [...prev, assistantReply]);
+
     try {
-      const response = await fetch("/ask-talent", {
+      const response = await fetch("https://talentcentral-assistant-clean.onrender.com/ask-talent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: messageText }),
       });
 
-      const data = await response.json();
+      if (!response.ok || !response.body) {
+        throw new Error("Server error");
+      }
 
-      setMessages((prev) => [
-        ...prev,
-        { sender: "assistant", text: data.response },
-      ]);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        assistantText += chunk;
+
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            sender: "assistant",
+            text: assistantText,
+          };
+          return updated;
+        });
+      }
     } catch (error) {
       setMessages((prev) => [
-        ...prev,
+        ...prev.slice(0, -1),
         {
           sender: "assistant",
           text: "❌ Sorry, something went wrong while connecting to the server.",
@@ -96,9 +124,10 @@ function App() {
         ))}
         {loading && (
           <div className="message assistant">
-            <em>Thinking...</em>
+            <em>Assistant is typing...</em>
           </div>
         )}
+        <div ref={chatEndRef} />
       </div>
 
       <div className="input-area">
