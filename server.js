@@ -23,11 +23,11 @@ app.use(express.json());
 // ✅ Initialize OpenAI client
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// ✅ GET route with `message` as query param (for native EventSource)
-app.get("/ask-talent", async (req, res) => {
+// ✅ POST route for assistant chat (for fetch + stream)
+app.post("/ask-talent", async (req, res) => {
   console.log("✅ /ask-talent hit");
 
-  const message = req.query.message;
+  const { message } = req.body;
   if (!message) {
     return res.status(400).json({ error: "Message is required." });
   }
@@ -44,13 +44,11 @@ app.get("/ask-talent", async (req, res) => {
       assistant_id: process.env.ASSISTANT_ID,
     });
 
-    // Set SSE headers
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders();
 
-    // Keep-alive ping
     const pingInterval = setInterval(() => {
       res.write(":\n\n");
       res.flush();
@@ -59,13 +57,12 @@ app.get("/ask-talent", async (req, res) => {
     for await (const chunk of stream) {
       const content = chunk.data?.delta?.text;
       if (content) {
-        res.write(`data: ${content}\n\n`);
+        res.write(`${content}`);
         res.flush();
       }
     }
 
     clearInterval(pingInterval);
-    res.write(`event: done\ndata: [DONE]\n\n`);
     res.end();
   } catch (err) {
     console.error("❌ Streaming error:", err);
