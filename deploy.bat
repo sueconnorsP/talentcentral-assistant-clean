@@ -6,7 +6,7 @@ call npm run build
 echo 🔄 Copying build to client directory in server root...
 cd ..
 rmdir /s /q client\build
-xcopy /E /I /Y my-chat-ui\build client\build
+xcopy /E /I /Y my-chat-ui\build .\client\build
 
 echo 💾 Staging changes for Git...
 git add .
