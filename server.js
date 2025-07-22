@@ -23,7 +23,13 @@ app.use(express.json());
 // ✅ Initialize OpenAI client
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// ✅ POST route for assistant chat (for fetch + stream)
+// ✅ Test route to verify server routing works
+app.get("/test", (req, res) => {
+  console.log("✅ /test hit");
+  res.send("It worked!");
+});
+
+// ✅ Main assistant POST route
 app.post("/ask-talent", async (req, res) => {
   console.log("✅ /ask-talent hit");
 
@@ -70,13 +76,14 @@ app.post("/ask-talent", async (req, res) => {
   }
 });
 
-// Serve React app
+// ✅ Serve React build from client/build (AFTER routes)
 app.use(express.static(path.join(__dirname, "client", "build")));
 
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "client", "build", "index.html"));
 });
 
+// ✅ Start server
 app.listen(port, () => {
   console.log(`🚀 TalentCentral Assistant server running on port ${port}`);
 });
