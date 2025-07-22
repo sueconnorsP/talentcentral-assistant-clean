@@ -23,12 +23,11 @@ app.use(express.json());
 // ✅ Initialize OpenAI client
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// ✅ API route - MUST be before React fallback
-app.post("/ask-talent", async (req, res) => {
+// ✅ GET route with `message` as query param (for native EventSource)
+app.get("/ask-talent", async (req, res) => {
   console.log("✅ /ask-talent hit");
 
-  const { message } = req.body;
-
+  const message = req.query.message;
   if (!message) {
     return res.status(400).json({ error: "Message is required." });
   }
@@ -45,7 +44,7 @@ app.post("/ask-talent", async (req, res) => {
       assistant_id: process.env.ASSISTANT_ID,
     });
 
-    // Set headers for SSE
+    // Set SSE headers
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -74,14 +73,13 @@ app.post("/ask-talent", async (req, res) => {
   }
 });
 
-// ✅ Serve React build from /client/build (AFTER routes)
+// Serve React app
 app.use(express.static(path.join(__dirname, "client", "build")));
 
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "client", "build", "index.html"));
 });
 
-// ✅ Start server
 app.listen(port, () => {
   console.log(`🚀 TalentCentral Assistant server running on port ${port}`);
 });

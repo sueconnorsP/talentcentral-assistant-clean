@@ -23,7 +23,7 @@ function App() {
     }
   }, [messages]);
 
-  const sendMessage = async (text) => {
+  const sendMessage = (text) => {
     const messageText = text || input.trim();
     if (!messageText) return;
 
@@ -32,51 +32,35 @@ function App() {
     setInput("");
     setLoading(true);
 
-    let assistantText = "";
     const assistantReply = { sender: "assistant", text: "" };
     setMessages((prev) => [...prev, assistantReply]);
 
-    try {
-      const response = await fetch("https://talentcentral-assistant-clean.onrender.com/ask-talent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: messageText }),
+    const url = `https://talentcentral-assistant-clean.onrender.com/ask-talent?message=${encodeURIComponent(messageText)}`;
+    const eventSource = new EventSource(url);
+
+    eventSource.onmessage = (event) => {
+      assistantReply.text += event.data;
+
+      setMessages((prev) => {
+        const updated = [...prev];
+        updated[updated.length - 1] = { ...assistantReply };
+        return updated;
       });
+    };
 
-      if (!response.ok || !response.body) {
-        throw new Error("Server error");
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder("utf-8");
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        assistantText += chunk;
-
-        setMessages((prev) => {
-          const updated = [...prev];
-          updated[updated.length - 1] = {
-            sender: "assistant",
-            text: assistantText,
-          };
-          return updated;
-        });
-      }
-    } catch (error) {
+    eventSource.onerror = () => {
       setMessages((prev) => [
         ...prev.slice(0, -1),
         {
           sender: "assistant",
-          text: "❌ Sorry, something went wrong while connecting to the server.",
+          text: "❌ Sorry, something went wrong while streaming the response.",
         },
       ]);
-    } finally {
+      eventSource.close();
       setLoading(false);
-    }
+    };
+
+    eventSource.onopen = () => setLoading(false);
   };
 
   const handleKeyPress = (e) => {
@@ -99,9 +83,7 @@ function App() {
         BC. Whether you're just starting out, changing careers, or looking to
         grow in the construction industry, we connect you with job
         opportunities, training programs, and resources from the British
-        Columbia Construction Association (BCCA) and its partners. Start here to
-        explore the tools and support you need to build your future in
-        construction.
+        Columbia Construction Association (BCCA) and its partners.
       </p>
 
       <div className="prompt-buttons">
