@@ -8,9 +8,9 @@ cd ..
 rmdir /s /q build
 xcopy /E /I /Y my-chat-ui\build build
 
-echo 🚀 Restarting server...
-taskkill /F /IM node.exe >nul 2>&1
-start "" /B cmd /c "node server.js"
+echo ✅ Deployment ready! Pushing to GitHub...
+git add .
+git commit -m "Deploy fullstack TalentCentral Assistant"
+git push origin main
 
-echo ✅ Deployment complete!
 pause

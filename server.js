@@ -1,4 +1,3 @@
-
 import path from "path";
 import { fileURLToPath } from "url";
 import express from "express";
@@ -34,6 +33,7 @@ app.post("/ask-talent", async (req, res) => {
 
   try {
     const thread = await openai.beta.threads.create();
+
     await openai.beta.threads.messages.create(thread.id, {
       role: "user",
       content: message,
@@ -51,19 +51,20 @@ app.post("/ask-talent", async (req, res) => {
 
     // Keep-alive ping every 15 seconds
     const pingInterval = setInterval(() => {
-      res.write(":
-
-"); // Comment to keep connection alive
+      res.write(`:\n\n`);
+      res.flush();
     }, 15000);
 
     for await (const chunk of stream) {
       const content = chunk.data?.delta?.text;
       if (content) {
         res.write(`data: ${content}\n\n`);
+        res.flush(); // Force flush to client
       }
     }
 
     clearInterval(pingInterval);
+    res.write(`event: done\ndata: [DONE]\n\n`); // Optional end event
     res.end();
   } catch (err) {
     console.error("❌ Streaming error:", err);
