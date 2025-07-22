@@ -20,11 +20,13 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Initialize OpenAI client
+// ✅ Initialize OpenAI client
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// API route to handle assistant conversation with streaming
+// ✅ API route - MUST be before React fallback
 app.post("/ask-talent", async (req, res) => {
+  console.log("✅ /ask-talent hit");
+
   const { message } = req.body;
 
   if (!message) {
@@ -43,15 +45,15 @@ app.post("/ask-talent", async (req, res) => {
       assistant_id: process.env.ASSISTANT_ID,
     });
 
-    // Set headers for SSE (Server-Sent Events)
+    // Set headers for SSE
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
-    res.flushHeaders(); // Ensure immediate header flush
+    res.flushHeaders();
 
-    // Keep-alive ping every 15 seconds
+    // Keep-alive ping
     const pingInterval = setInterval(() => {
-      res.write(`:\n\n`);
+      res.write(":\n\n");
       res.flush();
     }, 15000);
 
@@ -59,12 +61,12 @@ app.post("/ask-talent", async (req, res) => {
       const content = chunk.data?.delta?.text;
       if (content) {
         res.write(`data: ${content}\n\n`);
-        res.flush(); // Force flush to client
+        res.flush();
       }
     }
 
     clearInterval(pingInterval);
-    res.write(`event: done\ndata: [DONE]\n\n`); // Optional end event
+    res.write(`event: done\ndata: [DONE]\n\n`);
     res.end();
   } catch (err) {
     console.error("❌ Streaming error:", err);
@@ -72,14 +74,14 @@ app.post("/ask-talent", async (req, res) => {
   }
 });
 
-// Serve React static build
+// ✅ Serve React build (AFTER routes)
 app.use(express.static(path.join(__dirname, "build")));
 
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "build", "index.html"));
 });
 
-// Start the server
+// ✅ Start server
 app.listen(port, () => {
-  console.log(`TalentCentral Assistant server running on port ${port}`);
+  console.log(`🚀 TalentCentral Assistant server running on port ${port}`);
 });
