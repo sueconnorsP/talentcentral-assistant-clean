@@ -3,14 +3,15 @@ echo 🛠 Building React app...
 cd my-chat-ui
 call npm run build
 
-echo 🔄 Copying build to server root...
+echo 🔄 Copying build to client directory in server root...
 cd ..
-rmdir /s /q build
-xcopy /E /I /Y my-chat-ui\build build
+rmdir /s /q client\build
+xcopy /E /I /Y my-chat-ui\build client\build
 
-echo ✅ Deployment ready! Pushing to GitHub...
+echo 💾 Staging changes for Git...
 git add .
-git commit -m "Deploy fullstack TalentCentral Assistant"
+git commit -m "Deploy updated TalentCentral fullstack app"
 git push origin main
 
+echo 🚀 Deployment pushed! Render will now rebuild.
 pause
