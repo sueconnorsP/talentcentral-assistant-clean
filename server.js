@@ -1,35 +1,30 @@
-import path from "path";
-import { fileURLToPath } from "url";
 import express from "express";
 import cors from "cors";
+import path from "path";
 import dotenv from "dotenv";
+import { fileURLToPath } from "url";
 import { OpenAI } from "openai";
 
-// Load environment variables
 dotenv.config();
-
-// Required for __dirname in ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Create Express app
 const app = express();
 const port = process.env.PORT || 3000;
+
+// Resolve __dirname in ES module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// ✅ Initialize OpenAI client
+// Serve static React build
+const clientBuildPath = path.join(__dirname, "client", "build");
+app.use(express.static(clientBuildPath));
+
+// OpenAI client
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// ✅ Test route to verify server routing works
-app.get("/test", (req, res) => {
-  console.log("✅ /test hit");
-  res.send("It worked!");
-});
-
-// ✅ Main assistant POST route
+// SSE endpoint
 app.post("/ask-talent", async (req, res) => {
   console.log("✅ /ask-talent hit");
 
@@ -50,25 +45,29 @@ app.post("/ask-talent", async (req, res) => {
       assistant_id: process.env.ASSISTANT_ID,
     });
 
+    // Setup SSE headers
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders();
 
-    const pingInterval = setInterval(() => {
+    // Keep-alive ping every 15s
+    const ping = setInterval(() => {
       res.write(":\n\n");
       res.flush();
     }, 15000);
 
+    // Stream response
     for await (const chunk of stream) {
       const content = chunk.data?.delta?.text;
       if (content) {
-        res.write(`${content}`);
+        res.write(`data: ${content}\n\n`);
         res.flush();
       }
     }
 
-    clearInterval(pingInterval);
+    clearInterval(ping);
+    res.write("data: [DONE]\n\n");
     res.end();
   } catch (err) {
     console.error("❌ Streaming error:", err);
@@ -76,14 +75,11 @@ app.post("/ask-talent", async (req, res) => {
   }
 });
 
-// ✅ Serve React build from client/build (AFTER routes)
-app.use(express.static(path.join(__dirname, "client", "build")));
-
+// React app catch-all
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "client", "build", "index.html"));
+  res.sendFile(path.join(clientBuildPath, "index.html"));
 });
 
-// ✅ Start server
 app.listen(port, () => {
-  console.log(`🚀 TalentCentral Assistant server running on port ${port}`);
+  console.log(`🚀 Server listening on port ${port}`);
 });
