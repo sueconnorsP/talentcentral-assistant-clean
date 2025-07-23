@@ -9,25 +9,15 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Resolve __dirname in ES module
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Serve static React build
-const clientBuildPath = path.join(__dirname, "client", "build");
-app.use(express.static(clientBuildPath));
-
-// OpenAI client
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// SSE endpoint
 app.post("/ask-talent", async (req, res) => {
-  console.log("✅ /ask-talent hit");
-
   const { message } = req.body;
   if (!message) {
     return res.status(400).json({ error: "Message is required." });
@@ -35,7 +25,6 @@ app.post("/ask-talent", async (req, res) => {
 
   try {
     const thread = await openai.beta.threads.create();
-
     await openai.beta.threads.messages.create(thread.id, {
       role: "user",
       content: message,
@@ -45,41 +34,29 @@ app.post("/ask-talent", async (req, res) => {
       assistant_id: process.env.ASSISTANT_ID,
     });
 
-    // Setup SSE headers
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders();
 
-    // Keep-alive ping every 15s
-    const ping = setInterval(() => {
-      res.write(":\n\n");
-      res.flush();
-    }, 15000);
-
-    // Stream response
     for await (const chunk of stream) {
-      const content = chunk.data?.delta?.text;
-      if (content) {
-        res.write(`data: ${content}\n\n`);
+      const text = chunk.data?.delta?.text;
+      if (text) {
+        res.write(`data: ${text}\n\n`);
         res.flush();
       }
     }
 
-    clearInterval(ping);
     res.write("data: [DONE]\n\n");
     res.end();
   } catch (err) {
-    console.error("❌ Streaming error:", err);
-    res.status(500).json({ error: "Server error." });
+    console.error("Error in stream:", err);
+    res.status(500).json({ error: "Streaming failed" });
   }
 });
 
-// React app catch-all
-app.get("*", (req, res) => {
-  res.sendFile(path.join(clientBuildPath, "index.html"));
-});
+const clientPath = path.join(__dirname, "client", "build");
+app.use(express.static(clientPath));
+app.get("*", (req, res) => res.sendFile(path.join(clientPath, "index.html")));
 
-app.listen(port, () => {
-  console.log(`🚀 Server listening on port ${port}`);
-});
+app.listen(port, () => console.log(`Listening on port ${port}`));

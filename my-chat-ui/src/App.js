@@ -5,14 +5,13 @@ function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const sendMessage = async (text) => {
-    const messageText = text || input.trim();
-    if (!messageText) return;
+  const sendMessage = async () => {
+    if (!input.trim()) return;
 
-    const userMessage = { sender: "user", text: messageText };
-    const assistantMessage = { sender: "assistant", text: "" };
+    const userMsg = { sender: "user", text: input };
+    const assistantMsg = { sender: "assistant", text: "" };
 
-    setMessages((prev) => [...prev, userMessage, assistantMessage]);
+    setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setInput("");
     setLoading(true);
 
@@ -20,14 +19,11 @@ function App() {
       const response = await fetch("/ask-talent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: messageText }),
+        body: JSON.stringify({ message: input }),
       });
-
-      if (!response.body) throw new Error("No response stream");
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
-
       let fullText = "";
 
       while (true) {
@@ -57,11 +53,11 @@ function App() {
           }
         }
       }
-    } catch (err) {
-      console.error("Streaming failed:", err);
+    } catch (error) {
+      console.error("Streaming error:", error);
       setMessages((prev) => [
         ...prev.slice(0, -1),
-        { sender: "assistant", text: "Sorry, something went wrong." },
+        { sender: "assistant", text: "Error loading response." },
       ]);
     }
 
@@ -69,39 +65,30 @@ function App() {
   };
 
   return (
-    <div style={{ maxWidth: "600px", margin: "2rem auto", fontFamily: "Arial, sans-serif" }}>
-      <h1>TalentCentral Assistant</h1>
-      <div style={{ border: "1px solid #ccc", padding: "1rem", minHeight: "300px" }}>
-        {messages.map((msg, index) => (
-          <div
-            key={index}
-            style={{
-              backgroundColor: msg.sender === "user" ? "#e8f0fe" : "#f1f3f4",
-              padding: "0.5rem",
-              marginBottom: "0.5rem",
-              borderRadius: "4px",
-            }}
-          >
+    <div style={{ padding: "2rem", maxWidth: "600px", margin: "0 auto" }}>
+      <h2>TalentCentral Assistant</h2>
+      <div style={{ minHeight: "300px", border: "1px solid #ccc", padding: "1rem" }}>
+        {messages.map((msg, idx) => (
+          <div key={idx} style={{ marginBottom: "0.5rem" }}>
             <strong>{msg.sender === "user" ? "You" : "Assistant"}:</strong> {msg.text}
           </div>
         ))}
-        {loading && <div><em>Typing...</em></div>}
+        {loading && <p><em>Typing...</em></p>}
       </div>
       <form
         onSubmit={(e) => {
           e.preventDefault();
           sendMessage();
         }}
-        style={{ marginTop: "1rem", display: "flex" }}
+        style={{ marginTop: "1rem" }}
       >
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask me anything..."
-          style={{ flex: 1, padding: "0.5rem" }}
+          style={{ width: "80%", padding: "0.5rem" }}
         />
-        <button type="submit" disabled={loading} style={{ marginLeft: "0.5rem" }}>
+        <button type="submit" style={{ padding: "0.5rem" }} disabled={loading}>
           Send
         </button>
       </form>
