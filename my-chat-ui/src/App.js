@@ -1,131 +1,110 @@
-import React, { useState, useEffect, useRef } from "react";
-import { EventSourcePolyfill } from 'event-source-polyfill'; 
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import "./App.css";
+import React, { useState } from "react";
 
 function App() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const chatEndRef = useRef(null);
 
-  const prompts = [
-    "How do I get started in a career in construction?",
-    "Where can I find support for getting my Red Seal Certification?",
-    "Where can I find training for construction jobs?",
-    "Is there funding available for upgrading my skills?",
-    "Are there mentors available to help me?",
-  ];
-
-  useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]);
-
-  const sendMessage = (text) => {
+  const sendMessage = async (text) => {
     const messageText = text || input.trim();
     if (!messageText) return;
 
     const userMessage = { sender: "user", text: messageText };
-    setMessages((prev) => [...prev, userMessage]);
+    const assistantMessage = { sender: "assistant", text: "" };
+
+    setMessages((prev) => [...prev, userMessage, assistantMessage]);
     setInput("");
     setLoading(true);
 
-    let assistantReply = { sender: "assistant", text: "" };
-    setMessages((prev) => [...prev, assistantReply]);
-
-    const eventSource = new EventSourcePolyfill("/ask-talent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: messageText }),
-    });
-
-    eventSource.onmessage = (event) => {
-      const chunk = event.data;
-      assistantReply.text += chunk;
-
-      setMessages((prev) => {
-        const updated = [...prev];
-        updated[updated.length - 1] = { ...assistantReply };
-        return updated;
+    try {
+      const response = await fetch("/ask-talent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: messageText }),
       });
-    };
 
-    eventSource.onerror = () => {
+      if (!response.body) throw new Error("No response stream");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+
+      let fullText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n\n");
+
+        for (let line of lines) {
+          if (line.startsWith("data: ")) {
+            const content = line.replace("data: ", "").trim();
+            if (content === "[DONE]") {
+              setLoading(false);
+              return;
+            }
+
+            fullText += content;
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                sender: "assistant",
+                text: fullText,
+              };
+              return updated;
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Streaming failed:", err);
       setMessages((prev) => [
         ...prev.slice(0, -1),
-        {
-          sender: "assistant",
-          text: "Sorry, something went wrong while streaming the response.",
-        },
+        { sender: "assistant", text: "Sorry, something went wrong." },
       ]);
-      eventSource.close();
-      setLoading(false);
-    };
-
-    eventSource.onopen = () => setLoading(false);
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      sendMessage();
     }
-  };
 
-  const clearChat = () => {
-    setMessages([]);
-    setInput("");
+    setLoading(false);
   };
 
   return (
-    <div className="chat-container">
-      <h1>Welcome to the Builders Life TalentCentral Assistant</h1>
-      <p className="intro">
-        Your one-stop destination for construction jobs and career support in BC.
-        Whether you're just starting out, changing careers, or looking to grow in the construction industry, we connect you with job opportunities, training programs, and resources from the British Columbia Construction Association (BCCA) and its partners.
-      </p>
-
-      <div className="prompt-buttons">
-        {prompts.map((prompt, index) => (
-          <button key={index} onClick={() => sendMessage(prompt)}>
-            {prompt}
-          </button>
-        ))}
-      </div>
-
-      <div className="chat-box">
-        {messages.map((msg, idx) => (
-          <div key={idx} className={`message ${msg.sender}`}>
-            <div className="markdown">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {msg.text}
-              </ReactMarkdown>
-            </div>
+    <div style={{ maxWidth: "600px", margin: "2rem auto", fontFamily: "Arial, sans-serif" }}>
+      <h1>TalentCentral Assistant</h1>
+      <div style={{ border: "1px solid #ccc", padding: "1rem", minHeight: "300px" }}>
+        {messages.map((msg, index) => (
+          <div
+            key={index}
+            style={{
+              backgroundColor: msg.sender === "user" ? "#e8f0fe" : "#f1f3f4",
+              padding: "0.5rem",
+              marginBottom: "0.5rem",
+              borderRadius: "4px",
+            }}
+          >
+            <strong>{msg.sender === "user" ? "You" : "Assistant"}:</strong> {msg.text}
           </div>
         ))}
-        {loading && (
-          <div className="message assistant">
-            <em>Assistant is typing...</em>
-          </div>
-        )}
-        <div ref={chatEndRef} />
+        {loading && <div><em>Typing...</em></div>}
       </div>
-
-      <div className="input-area">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          sendMessage();
+        }}
+        style={{ marginTop: "1rem", display: "flex" }}
+      >
         <input
+          type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyPress}
-          placeholder="Type your message..."
+          placeholder="Ask me anything..."
+          style={{ flex: 1, padding: "0.5rem" }}
         />
-        <button onClick={() => sendMessage()}>Send</button>
-        <button onClick={clearChat} className="clear-btn">
-          Clear
+        <button type="submit" disabled={loading} style={{ marginLeft: "0.5rem" }}>
+          Send
         </button>
-      </div>
+      </form>
     </div>
   );
 }
