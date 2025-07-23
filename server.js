@@ -1,24 +1,30 @@
+import path from "path";
+import { fileURLToPath } from "url";
 import express from "express";
 import cors from "cors";
-import path from "path";
 import dotenv from "dotenv";
-import { fileURLToPath } from "url";
 import { OpenAI } from "openai";
 
 dotenv.config();
+
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Needed for __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
+// OpenAI setup
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-app.post("/ask-talent", async (req, res) => {
+// API route (non-streaming)
+app.post("/ask", async (req, res) => {
   const { message } = req.body;
+
   if (!message) {
     return res.status(400).json({ error: "Message is required." });
   }
@@ -30,33 +36,34 @@ app.post("/ask-talent", async (req, res) => {
       content: message,
     });
 
-    const stream = await openai.beta.threads.runs.stream(thread.id, {
+    const runResult = await openai.beta.threads.runs.createAndPoll(thread.id, {
       assistant_id: process.env.ASSISTANT_ID,
     });
 
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders();
+    const messages = await openai.beta.threads.messages.list(thread.id);
+    const assistantMessage = messages.data.find(
+      (msg) => msg.role === "assistant"
+    );
 
-    for await (const chunk of stream) {
-      const text = chunk.data?.delta?.text;
-      if (text) {
-        res.write(`data: ${text}\n\n`);
-        res.flush();
-      }
-    }
-
-    res.write("data: [DONE]\n\n");
-    res.end();
+    res.json({
+      response:
+        assistantMessage?.content[0]?.text?.value ||
+        "Hmm, I couldn't find a good answer for that.",
+    });
   } catch (err) {
-    console.error("Error in stream:", err);
-    res.status(500).json({ error: "Streaming failed" });
+    console.error("Error during OpenAI call:", err);
+    res.status(500).json({ error: "Server error." });
   }
 });
 
-const clientPath = path.join(__dirname, "client", "build");
-app.use(express.static(clientPath));
-app.get("*", (req, res) => res.sendFile(path.join(clientPath, "index.html")));
+// Serve React app
+app.use(express.static(path.join(__dirname, "client", "build")));
 
-app.listen(port, () => console.log(`Listening on port ${port}`));
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "client", "build", "index.html"));
+});
+
+// Start server
+app.listen(port, () => {
+  console.log("✅ TalentCentral server running on port", port);
+});

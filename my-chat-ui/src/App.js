@@ -16,7 +16,7 @@ function App() {
     setLoading(true);
 
     try {
-      const response = await fetch("/ask-talent", {
+      const response = await fetch("/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: input }),
